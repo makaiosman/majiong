@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>广东麻将小游戏</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        #gameContainer {
+            display: none;
+        }
+        #playerList {
+            margin: 20px 0;
+        }
+        .tile {
+            display: inline-block;
+            width: 50px;
+            height: 70px;
+            margin: 5px;
+            background-color: #fff;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 18px;
+            line-height: 70px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .tile:hover {
+            border-color: #007BFF;
+        }
+        .button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        #playerInputContainer {
+            margin-top: 50px;
+        }
+        #playerInputContainer input {
+            padding: 10px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        #actionButtons {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>广东麻将小游戏</h1>
+    <div id="playerInputContainer">
+        <input type="text" id="nicknameInput" placeholder="请输入昵称">
+        <button class="button" onclick="startGame()">进入游戏</button>
+    </div>
+
+    <div id="gameContainer">
+        <div id="gameInfo">
+            <h2>当前玩家：<span id="currentPlayer"></span></h2>
+        </div>
+        <div id="playerList"></div>
+        <div id="gameBoard"></div>
+        <div id="actionButtons">
+            <button class="button" onclick="drawTile()">摸牌</button>
+            <button class="button" onclick="attemptGang()">杠</button>
+            <button class="button" onclick="attemptHu()">胡</button>
+        </div>
+    </div>
+
+    <script>
+        const tiles = [
+            "🀇", "🀈", "🀉", "🀊", "🀋", "🀌", "🀍", "🀎", "🀏", // 万
+            "🀐", "🀑", "🀒", "🀓", "🀔", "🀕", "🀖", "🀗", "🀘", // 条
+            "🀙", "🀚", "🀛", "🀜", "🀝", "🀞", "🀟", "🀠", "🀡", // 筒
+            "🀀", "🀁", "🀂", "🀃", // 东南西北
+            "🀆", "🀅", "🀄" // 中发白
+        ];
+
+        let players = [];
+        let currentPlayerIndex = 0;
+        let deck = [];
+        let discardPile = [];
+
+        function startGame() {
+            const nickname = document.getElementById('nicknameInput').value.trim();
+            if (!nickname) {
+                alert('请输入昵称！');
+                return;
+            }
+            initializeGame(nickname);
+        }
+
+        function initializeGame(nickname) {
+            players = [
+                { name: nickname, score: 0, hand: [], melds: [] },
+                { name: "玩家2", score: 0, hand: [], melds: [] },
+                { name: "玩家3", score: 0, hand: [], melds: [] },
+                { name: "玩家4", score: 0, hand: [], melds: [] },
+            ];
+
+            deck = generateDeck();
+            dealTiles();
+            document.getElementById("playerInputContainer").style.display = "none";
+            document.getElementById("gameContainer").style.display = "block";
+
+            updateGameInfo();
+            renderHand(players[currentPlayerIndex].hand);
+        }
+
+        function generateDeck() {
+            const fullDeck = [...tiles, ...tiles, ...tiles, ...tiles];
+            shuffle(fullDeck);
+            return fullDeck;
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function dealTiles() {
+            for (let i = 0; i < players.length; i++) {
+                players[i].hand = deck.splice(0, 13);
+            }
+        }
+
+        function renderHand(hand) {
+            const gameBoard = document.getElementById('gameBoard');
+            gameBoard.innerHTML = '';
+            hand.forEach((tile, index) => {
+                const tileDiv = document.createElement('div');
+                tileDiv.classList.add('tile');
+                tileDiv.innerText = tile;
+                tileDiv.onclick = () => discardTile(index);
+                gameBoard.appendChild(tileDiv);
+            });
+        }
+
+        function drawTile() {
+            if (deck.length === 0) {
+                alert("牌堆已空，游戏结束！");
+                return;
+            }
+
+            const currentPlayer = players[currentPlayerIndex];
+            const newTile = deck.pop();
+            currentPlayer.hand.push(newTile);
+            renderHand(currentPlayer.hand);
+
+            alert(`${currentPlayer.name} 摸牌：${newTile}`);
+        }
+
+        function discardTile(index) {
+            const currentPlayer = players[currentPlayerIndex];
+            const discardedTile = currentPlayer.hand.splice(index, 1)[0];
+            discardPile.push(discardedTile);
+
+            alert(`${currentPlayer.name} 打出了 ${discardedTile}`);
+            passTurn();
+        }
+
+        function passTurn() {
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            updateGameInfo();
+            renderHand(players[currentPlayerIndex].hand);
+        }
+
+        function attemptGang() {
+            const currentPlayer = players[currentPlayerIndex];
+            const counts = countTiles(currentPlayer.hand);
+            const gangTiles = Object.keys(counts).filter(tile => counts[tile] === 4);
+
+            if (gangTiles.length > 0) {
+                gangTiles.forEach(tile => {
+                    alert(`${currentPlayer.name} 杠了 ${tile}`);
+                    currentPlayer.melds.push({ type: "杠", tile });
+                    currentPlayer.hand = currentPlayer.hand.filter(t => t !== tile);
+                    currentPlayer.score += 6;
+                });
+
+                updateGameInfo();
+                renderHand(currentPlayer.hand);
+            } else {
+                alert("没有可以杠的牌！");
+            }
+        }
+
+        function attemptHu() {
+            const currentPlayer = players[currentPlayerIndex];
+            if (isWinningHand(currentPlayer.hand)) {
+                alert(`${currentPlayer.name} 胡牌了！`);
+                currentPlayer.score += 10;
+                endGame();
+            } else {
+                alert("未满足胡牌条件！");
+            }
+        }
+
+        function isWinningHand(hand) {
+            return hand.length === 14; // 简化：这里可以扩展为详细牌型检测
+        }
+
+        function updateGameInfo() {
+            const playerList = document.getElementById("playerList");
+            playerList.innerHTML = players.map(
+                player => `<p>${player.name} - 分数: ${player.score}</p>`
+            ).join('');
+            document.getElementById("currentPlayer").innerText = players[currentPlayerIndex].name;
+        }
+
+        function endGame() {
+            alert("游戏结束，查看分数！");
+            players.forEach(player => alert(`${player.name}: ${player.score} 分`));
+        }
+
+        function countTiles(hand) {
+            return hand.reduce((acc, tile) => {
+                acc[tile] = (acc[tile] || 0) + 1;
+                return acc;
+            }, {});
+        }
+    </script>
+</body>
+</html>
